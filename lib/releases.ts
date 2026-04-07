@@ -1,8 +1,4 @@
-import fs from "fs";
-import path from "path";
-import matter from "gray-matter";
-
-const RELEASES_DIR = path.join(process.cwd(), "content", "releases");
+import { put, list, head, del } from "@vercel/blob";
 
 export interface ReleaseMeta {
   issue: number;
@@ -14,80 +10,83 @@ export interface ReleaseMeta {
   slug: string;
 }
 
-export function getAllReleases(): ReleaseMeta[] {
-  if (!fs.existsSync(RELEASES_DIR)) return [];
+export interface ReleaseData {
+  meta: ReleaseMeta;
+  content: string;
+}
 
-  const folders = fs
-    .readdirSync(RELEASES_DIR)
-    .filter((f) => fs.statSync(path.join(RELEASES_DIR, f)).isDirectory());
+const BLOB_PREFIX = "releases/";
 
-  const releases: ReleaseMeta[] = [];
+function blobPath(slug: string): string {
+  return `${BLOB_PREFIX}${slug}.json`;
+}
 
-  for (const folder of folders) {
-    const mdxPath = path.join(RELEASES_DIR, folder, "index.mdx");
-    if (!fs.existsSync(mdxPath)) continue;
+export async function getAllReleases(): Promise<ReleaseMeta[]> {
+  try {
+    const { blobs } = await list({ prefix: BLOB_PREFIX });
+    const releases: ReleaseMeta[] = [];
 
-    const raw = fs.readFileSync(mdxPath, "utf-8");
-    const { data } = matter(raw);
+    for (const blob of blobs) {
+      try {
+        const res = await fetch(blob.url);
+        const data: ReleaseData = await res.json();
+        releases.push(data.meta);
+      } catch {
+        // skip corrupt blobs
+      }
+    }
 
-    releases.push({
-      issue: data.issue,
-      version: data.version,
-      date: data.date,
-      headline: data.headline,
-      summary: data.summary || "",
-      tags: data.tags || [],
-      slug: folder.replace(/^\d+-/, "").replace(/^\d+-/, ""),
-    });
+    return releases.sort((a, b) => b.issue - a.issue);
+  } catch {
+    return [];
+  }
+}
+
+export async function getReleaseBySlug(slug: string): Promise<ReleaseData | null> {
+  try {
+    const { blobs } = await list({ prefix: BLOB_PREFIX });
+    const blob = blobs.find((b) => b.pathname === blobPath(slug));
+    if (!blob) return null;
+
+    const res = await fetch(blob.url);
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function saveRelease(slug: string, data: ReleaseData): Promise<void> {
+  // Delete old blob if exists (in case slug changed)
+  try {
+    const { blobs } = await list({ prefix: BLOB_PREFIX });
+    const existing = blobs.find((b) => b.pathname === blobPath(slug));
+    if (existing) {
+      await del(existing.url);
+    }
+  } catch {
+    // ignore
   }
 
-  return releases.sort((a, b) => b.issue - a.issue);
-}
-
-export function getReleaseBySlug(slug: string): { meta: ReleaseMeta; content: string } | null {
-  if (!fs.existsSync(RELEASES_DIR)) return null;
-
-  const folders = fs.readdirSync(RELEASES_DIR);
-  const folder = folders.find((f) => {
-    const folderSlug = f.replace(/^\d+-/, "");
-    return folderSlug === slug;
+  await put(blobPath(slug), JSON.stringify(data), {
+    access: "public",
+    addRandomSuffix: false,
+    contentType: "application/json",
   });
-
-  if (!folder) return null;
-
-  const mdxPath = path.join(RELEASES_DIR, folder, "index.mdx");
-  if (!fs.existsSync(mdxPath)) return null;
-
-  const raw = fs.readFileSync(mdxPath, "utf-8");
-  const { data, content } = matter(raw);
-
-  return {
-    meta: {
-      issue: data.issue,
-      version: data.version,
-      date: data.date,
-      headline: data.headline,
-      summary: data.summary || "",
-      tags: data.tags || [],
-      slug: folder.replace(/^\d+-/, ""),
-    },
-    content,
-  };
 }
 
-export function getLatestRelease(): ReleaseMeta | null {
-  const all = getAllReleases();
+export async function getLatestRelease(): Promise<ReleaseMeta | null> {
+  const all = await getAllReleases();
   return all.length > 0 ? all[0] : null;
 }
 
-export function getReleaseFolder(slug: string): string | null {
-  if (!fs.existsSync(RELEASES_DIR)) return null;
-
-  const folders = fs.readdirSync(RELEASES_DIR);
-  const folder = folders.find((f) => {
-    const folderSlug = f.replace(/^\d+-/, "");
-    return folderSlug === slug;
-  });
-
-  return folder || null;
+export async function deleteRelease(slug: string): Promise<void> {
+  try {
+    const { blobs } = await list({ prefix: BLOB_PREFIX });
+    const blob = blobs.find((b) => b.pathname === blobPath(slug));
+    if (blob) {
+      await del(blob.url);
+    }
+  } catch {
+    // ignore
+  }
 }

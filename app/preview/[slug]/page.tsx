@@ -3,13 +3,15 @@ import { getAllReleases, getReleaseBySlug } from "@/lib/releases";
 import ReleasePage from "@/components/release-page";
 import MDXContent from "@/components/mdx-content";
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const release = getReleaseBySlug(slug);
+  const release = await getReleaseBySlug(slug);
   if (!release) return { title: "Preview Not Found" };
   return {
     title: `[Preview] ${release.meta.headline} - Melow Weekly #${release.meta.issue}`,
@@ -23,10 +25,10 @@ export default async function PreviewPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const release = getReleaseBySlug(slug);
+  const release = await getReleaseBySlug(slug);
   if (!release) notFound();
 
-  const allReleases = getAllReleases();
+  const allReleases = await getAllReleases();
   const pastReleases = allReleases
     .filter((r) => r.issue !== release.meta.issue)
     .slice(0, 10)
@@ -38,12 +40,7 @@ export default async function PreviewPage({
       slug: r.slug,
     }));
 
-  let processedContent = release.content.replace(
-    /src="\.\/([^"]+)"/g,
-    `src="/releases/${slug}/$1"`
-  );
-
-  processedContent = processedContent.replace(
+  const processedContent = release.content.replace(
     /^\*\*(.+?)\*\*$/gm,
     "$1"
   );

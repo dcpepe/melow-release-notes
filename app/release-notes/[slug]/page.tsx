@@ -3,10 +3,7 @@ import { getAllReleases, getReleaseBySlug } from "@/lib/releases";
 import ReleasePage from "@/components/release-page";
 import MDXContent from "@/components/mdx-content";
 
-export async function generateStaticParams() {
-  const releases = getAllReleases();
-  return releases.map((r) => ({ slug: r.slug }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -14,7 +11,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const release = getReleaseBySlug(slug);
+  const release = await getReleaseBySlug(slug);
   if (!release) return { title: "Not Found" };
   return {
     title: `${release.meta.headline} - Melow Weekly #${release.meta.issue}`,
@@ -28,10 +25,10 @@ export default async function ReleaseSlugPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const release = getReleaseBySlug(slug);
+  const release = await getReleaseBySlug(slug);
   if (!release) notFound();
 
-  const allReleases = getAllReleases();
+  const allReleases = await getAllReleases();
   const pastReleases = allReleases
     .filter((r) => r.issue !== release.meta.issue)
     .slice(0, 10)
@@ -43,14 +40,8 @@ export default async function ReleaseSlugPage({
       slug: r.slug,
     }));
 
-  // Rewrite relative media paths to public paths
-  let processedContent = release.content.replace(
-    /src="\.\/([^"]+)"/g,
-    `src="/releases/${slug}/$1"`
-  );
-
-  // Clean up stray markdown bold/italic that MDX doesn't render
-  processedContent = processedContent.replace(
+  // Clean up stray markdown bold
+  const processedContent = release.content.replace(
     /^\*\*(.+?)\*\*$/gm,
     "$1"
   );

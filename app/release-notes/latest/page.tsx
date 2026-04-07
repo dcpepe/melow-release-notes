@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 import { getLatestRelease } from "@/lib/releases";
 
-export default function LatestReleasePage() {
-  const latest = getLatestRelease();
+export const dynamic = "force-dynamic";
+
+export default async function LatestReleasePage() {
+  const latest = await getLatestRelease();
   if (!latest) {
     return (
       <div className="min-h-screen bg-bg flex items-center justify-center">

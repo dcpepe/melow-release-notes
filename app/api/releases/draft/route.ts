@@ -41,7 +41,7 @@ export async function POST() {
       try {
         // Step 1: Read existing releases
         send("step", { message: "Reading existing releases..." });
-        const existing = getAllReleases();
+        const existing = await getAllReleases();
         const latestIssue = existing.length > 0 ? existing[0].issue : 0;
         const nextIssue = latestIssue + 1;
         const nextVersion = existing.length > 0 ? bumpVersion(existing[0].version) : "1.0.0";
