@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { upload } from "@vercel/blob/client";
 
 interface MediaUploadProps {
   onUploaded: (result: { url: string; filename: string; type: "Video" | "Gif" | "Screenshot" | "Audio" }) => void;
@@ -27,20 +26,44 @@ export default function MediaUpload({ onUploaded, mediaSuggestion }: MediaUpload
     setError("");
 
     try {
-      const blob = await upload(file.name, file, {
-        access: "public",
-        handleUploadUrl: "/api/upload",
-        onUploadProgress: ({ percentage }) => {
-          setProgress(percentage);
-        },
+      // Use XMLHttpRequest for progress tracking
+      const result = await new Promise<{ url: string; filename: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append("file", file);
+
+        xhr.upload.addEventListener("progress", (e) => {
+          if (e.lengthComputable) {
+            setProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        });
+
+        xhr.addEventListener("load", () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            try {
+              const err = JSON.parse(xhr.responseText);
+              reject(new Error(err.error || `Upload failed (${xhr.status})`));
+            } catch {
+              reject(new Error(`Upload failed (${xhr.status})`));
+            }
+          }
+        });
+
+        xhr.addEventListener("error", () => reject(new Error("Network error")));
+        xhr.addEventListener("abort", () => reject(new Error("Upload cancelled")));
+
+        xhr.open("POST", "/api/upload");
+        xhr.send(formData);
       });
 
       setUploading(false);
       setProgress(100);
 
       onUploaded({
-        url: blob.url,
-        filename: file.name,
+        url: result.url,
+        filename: result.filename,
         type: getMediaType(file.name),
       });
     } catch (err) {
@@ -77,7 +100,7 @@ export default function MediaUpload({ onUploaded, mediaSuggestion }: MediaUpload
     >
       {uploading ? (
         <div>
-          <p className="text-sm text-gold mb-3">Uploading... {Math.round(progress)}%</p>
+          <p className="text-sm text-gold mb-3">Uploading... {progress}%</p>
           <div className="w-full bg-bg rounded-full h-1.5 overflow-hidden">
             <div
               className="h-full bg-gold rounded-full transition-all duration-300"
@@ -101,7 +124,7 @@ export default function MediaUpload({ onUploaded, mediaSuggestion }: MediaUpload
             Drop a video, GIF, image, or audio file here
           </p>
           <p className="text-xs text-text-tertiary">
-            or click to browse (up to 100MB)
+            or click to browse
           </p>
         </>
       )}
