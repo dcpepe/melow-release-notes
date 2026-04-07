@@ -7,6 +7,8 @@ export interface Section {
     src: string;
     caption?: string;
   };
+  mediaSuggestion?: string;
+  sourceUrl?: string;
 }
 
 let sectionCounter = 0;
@@ -22,6 +24,8 @@ export function parseSections(mdxContent: string): Section[] {
   let currentHeading = "";
   let currentBodyLines: string[] = [];
   let currentMedia: Section["media"] | undefined;
+  let currentMediaSuggestion: string | undefined;
+  let currentSourceUrl: string | undefined;
 
   function flush() {
     if (currentHeading || currentBodyLines.length > 0) {
@@ -30,11 +34,15 @@ export function parseSections(mdxContent: string): Section[] {
         heading: currentHeading,
         body: currentBodyLines.join("\n").trim(),
         media: currentMedia,
+        mediaSuggestion: currentMediaSuggestion,
+        sourceUrl: currentSourceUrl,
       });
     }
     currentHeading = "";
     currentBodyLines = [];
     currentMedia = undefined;
+    currentMediaSuggestion = undefined;
+    currentSourceUrl = undefined;
   }
 
   for (const line of lines) {
@@ -56,6 +64,24 @@ export function parseSections(mdxContent: string): Section[] {
         src: mediaMatch[2],
         caption: mediaMatch[3] || undefined,
       };
+      continue;
+    }
+
+    // Match media suggestion comments
+    const suggestionMatch = line.match(
+      /^\{\/\*\s*Media suggestion:\s*(.+?)\s*\*\/\}$/
+    );
+    if (suggestionMatch) {
+      currentMediaSuggestion = suggestionMatch[1];
+      continue;
+    }
+
+    // Match source URL comments
+    const sourceMatch = line.match(
+      /^\{\/\*\s*Source:\s*(.+?)\s*\*\/\}$/
+    );
+    if (sourceMatch) {
+      currentSourceUrl = sourceMatch[1];
       continue;
     }
 

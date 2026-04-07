@@ -317,9 +317,22 @@ export default function EditRelease() {
                 >
                   {/* Section controls */}
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-xs text-text-tertiary">
-                      Section {index + 1}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-text-tertiary">
+                        Section {index + 1}
+                      </span>
+                      {section.sourceUrl && (
+                        <a
+                          href={section.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-gold/50 hover:text-gold transition-colors"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          Linear ticket
+                        </a>
+                      )}
+                    </div>
                     <div className="flex items-center gap-1">
                       <button
                         onClick={() => moveSection(index, -1)}
@@ -405,12 +418,17 @@ export default function EditRelease() {
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={(e) => handleMediaDrop(e, index)}
                       onClick={() => handleMediaFileSelect(index)}
-                      className="border border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:border-gold/40 transition-colors"
+                      className="border border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-gold/40 transition-colors"
                     >
                       {uploading === section.id ? (
                         <p className="text-sm text-gold">Uploading...</p>
                       ) : (
                         <>
+                          {section.mediaSuggestion && (
+                            <p className="text-sm text-gold mb-3">
+                              Suggestion: {section.mediaSuggestion}
+                            </p>
+                          )}
                           <p className="text-sm text-text-tertiary mb-1">
                             Drop a video, GIF, or image here
                           </p>

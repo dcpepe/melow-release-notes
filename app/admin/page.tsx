@@ -16,8 +16,8 @@ interface Release {
 export default function AdminDashboard() {
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreate, setShowCreate] = useState(false);
-  const [creating, setCreating] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genStatus, setGenStatus] = useState("");
 
   useEffect(() => {
     fetch("/api/releases")
@@ -28,34 +28,33 @@ export default function AdminDashboard() {
       });
   }, []);
 
-  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setCreating(true);
-    const form = new FormData(e.currentTarget);
-    const nextIssue = releases.length > 0 ? releases[0].issue + 1 : 1;
-    const lastVersion = releases.length > 0 ? releases[0].version : "1.0.0";
-    const parts = lastVersion.split(".");
-    const nextVersion = `${parts[0]}.${parts[1]}.${parseInt(parts[2] || "0") + 1}`;
+  async function handleNewRelease() {
+    setGenerating(true);
+    setGenStatus("Fetching shipped tickets from Linear...");
 
-    const payload = {
-      issue: nextIssue,
-      version: nextVersion,
-      date: new Date().toISOString().split("T")[0],
-      headline: form.get("headline") as string,
-      summary: form.get("summary") as string,
-      slug: (form.get("slug") as string) || "draft",
-      tags: [],
-    };
+    try {
+      const res = await fetch("/api/releases/draft", { method: "POST" });
+      const result = await res.json();
 
-    const res = await fetch("/api/releases", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-    const result = await res.json();
-    setCreating(false);
-    setShowCreate(false);
-    window.location.href = `/admin/edit/${result.slug}`;
+      if (result.error) {
+        setGenStatus(result.error);
+        setTimeout(() => {
+          window.location.href = `/admin/edit/${result.slug}`;
+        }, 2000);
+        return;
+      }
+
+      setGenStatus(
+        `Done. ${result.ticketCount} tickets rewritten. Headline: "${result.headline}"`
+      );
+
+      setTimeout(() => {
+        window.location.href = `/admin/edit/${result.slug}`;
+      }, 1500);
+    } catch (err) {
+      setGenStatus("Something went wrong. Check your API keys.");
+      setGenerating(false);
+    }
   }
 
   return (
@@ -66,66 +65,51 @@ export default function AdminDashboard() {
             Melow Weekly Admin
           </h1>
           <button
-            onClick={() => setShowCreate(!showCreate)}
-            className="text-sm text-bg bg-gold px-4 py-2 rounded hover:opacity-90 transition-opacity"
+            onClick={handleNewRelease}
+            disabled={generating}
+            className="text-sm text-bg bg-gold px-4 py-2 rounded hover:opacity-90 transition-opacity disabled:opacity-70"
           >
-            New Release
+            {generating ? "Generating..." : "New Release"}
           </button>
         </div>
 
-        {/* Create form */}
-        {showCreate && (
-          <form
-            onSubmit={handleCreate}
-            className="mb-10 p-6 rounded-lg"
-            style={{ background: "#161616", border: "0.5px solid rgba(201, 162, 75, 0.15)" }}
+        {/* Generation status */}
+        {genStatus && (
+          <div
+            className="mb-8 p-5 rounded-lg"
+            style={{
+              background: "#161616",
+              border: "0.5px solid rgba(201, 162, 75, 0.15)",
+            }}
           >
-            <h2 className="text-sm text-text-tertiary uppercase tracking-wide mb-4">Create release</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm text-text-secondary mb-1">Headline</label>
-                <input
-                  name="headline"
-                  required
-                  placeholder="What shipped this week"
-                  className="w-full bg-bg border border-border rounded px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-gold"
+            <div className="flex items-start gap-3">
+              {generating && (
+                <div
+                  className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full shrink-0 mt-0.5"
+                  style={{ animation: "spin 0.8s linear infinite" }}
                 />
-              </div>
+              )}
               <div>
-                <label className="block text-sm text-text-secondary mb-1">Summary</label>
-                <textarea
-                  name="summary"
-                  required
-                  rows={2}
-                  placeholder="One or two sentence summary"
-                  className="w-full bg-bg border border-border rounded px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-gold resize-none"
-                />
+                <p className="text-sm text-text-secondary">{genStatus}</p>
+                {generating && (
+                  <p className="text-xs text-text-tertiary mt-2">
+                    Pulling tickets from Linear, rewriting each one with Claude,
+                    generating headline and summary. This takes 15-30 seconds.
+                  </p>
+                )}
               </div>
-              <div>
-                <label className="block text-sm text-text-secondary mb-1">Slug</label>
-                <input
-                  name="slug"
-                  required
-                  placeholder="e.g. mila-learns-to-chart"
-                  className="w-full bg-bg border border-border rounded px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-gold"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={creating}
-                className="text-sm text-bg bg-gold px-4 py-2 rounded hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {creating ? "Creating..." : "Create"}
-              </button>
             </div>
-          </form>
+          </div>
         )}
 
         {/* Releases list */}
         {loading ? (
           <p className="text-text-tertiary text-sm">Loading...</p>
         ) : releases.length === 0 ? (
-          <p className="text-text-tertiary text-sm">No releases yet. Create your first one.</p>
+          <p className="text-text-tertiary text-sm">
+            No releases yet. Click "New Release" to pull tickets from Linear and
+            generate your first draft.
+          </p>
         ) : (
           <div>
             {releases.map((r) => (
@@ -133,7 +117,9 @@ export default function AdminDashboard() {
                 key={r.slug}
                 href={`/admin/edit/${r.slug}`}
                 className="group flex items-center justify-between py-4 transition-colors"
-                style={{ borderBottom: "0.5px solid rgba(201, 162, 75, 0.08)" }}
+                style={{
+                  borderBottom: "0.5px solid rgba(201, 162, 75, 0.08)",
+                }}
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-3 mb-1">
@@ -143,9 +129,7 @@ export default function AdminDashboard() {
                     <span className="text-xs text-text-tertiary">
                       v{r.version}
                     </span>
-                    <span className="text-xs text-text-tertiary">
-                      {r.date}
-                    </span>
+                    <span className="text-xs text-text-tertiary">{r.date}</span>
                   </div>
                   <p className="text-text-primary group-hover:text-gold transition-colors truncate">
                     {r.headline}
@@ -162,6 +146,14 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+
+      <style jsx>{`
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </div>
   );
 }
