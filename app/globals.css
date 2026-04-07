@@ -108,3 +108,54 @@ body {
 .prose a:hover {
   color: var(--text-primary);
 }
+
+/* Tiptap editor styles */
+.tiptap {
+  outline: none;
+}
+
+.tiptap p {
+  margin-bottom: 0.5em;
+}
+
+.tiptap p:last-child {
+  margin-bottom: 0;
+}
+
+.tiptap strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.tiptap em {
+  font-style: italic;
+}
+
+.tiptap ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin-bottom: 0.5em;
+}
+
+.tiptap li {
+  margin-bottom: 0.25em;
+}
+
+.tiptap li::marker {
+  color: var(--gold-muted);
+}
+
+.tiptap blockquote {
+  border-left: 2px solid var(--gold-muted);
+  padding-left: 0.75rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+}
+
+.tiptap p.is-editor-empty:first-child::before {
+  color: var(--text-tertiary);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}

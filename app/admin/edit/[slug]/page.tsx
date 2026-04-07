@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { parseSections, serializeSections, Section } from "@/lib/sections";
+import RichEditor from "@/components/admin/rich-editor";
 import Link from "next/link";
 
 export default function EditRelease() {
@@ -578,13 +579,13 @@ export default function EditRelease() {
                     className="w-full bg-bg border border-border rounded px-3 py-2 text-text-primary font-serif text-lg mb-3 focus:outline-none focus:border-gold"
                   />
 
-                  <textarea
-                    value={section.body}
-                    onChange={(e) => updateSection(index, { body: e.target.value })}
-                    placeholder="Section content..."
-                    rows={4}
-                    className="w-full bg-bg border border-border rounded px-3 py-2 text-text-secondary text-sm mb-3 focus:outline-none focus:border-gold resize-y"
-                  />
+                  <div className="mb-3">
+                    <RichEditor
+                      value={section.body}
+                      onChange={(val) => updateSection(index, { body: val })}
+                      placeholder="Write your section content..."
+                    />
+                  </div>
 
                   {section.media ? (
                     <div className="relative">
