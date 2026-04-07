@@ -59,13 +59,20 @@ export default function EditRelease() {
       setLoading(false);
     } else {
       fetch(`/api/releases/${slug}`)
-        .then((r) => r.json())
+        .then((r) => {
+          if (!r.ok) throw new Error("Not found");
+          return r.json();
+        })
         .then((data) => {
           setMeta({ ...data.meta, slug: data.meta.slug || slug });
           setSections(parseSections(data.content));
           setMediaFiles(data.mediaFiles || []);
           setEditSlug(data.meta.slug || slug);
           setLoading(false);
+        })
+        .catch(() => {
+          // Release not found, redirect to admin
+          window.location.href = "/admin";
         });
     }
   }, [slug, isNew]);
@@ -153,7 +160,7 @@ export default function EditRelease() {
     const content = serializeSections(sections);
 
     if (isNewDraft) {
-      await fetch("/api/releases", {
+      const res = await fetch("/api/releases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -167,8 +174,14 @@ export default function EditRelease() {
           content,
         }),
       });
+      if (!res.ok) {
+        setSaving(false);
+        return;
+      }
       setIsNewDraft(false);
       setSaving(false);
+      // Update URL without reload so refresh works
+      window.history.replaceState(null, "", `/admin/edit/${targetSlug}`);
       // Go straight to preview
       setShowPreview(true);
     } else {
