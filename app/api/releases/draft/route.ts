@@ -44,11 +44,15 @@ export async function POST() {
         const existing = getAllReleases();
         const latestIssue = existing.length > 0 ? existing[0].issue : 0;
         const nextIssue = latestIssue + 1;
-        const sinceDate = existing.length > 0 ? existing[0].date : "2025-01-01";
         const nextVersion = existing.length > 0 ? bumpVersion(existing[0].version) : "1.0.0";
         const today = new Date().toISOString().split("T")[0];
+        // Always pull last 7 days
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const sinceDate = sevenDaysAgo.toISOString().split("T")[0];
+
         send("step", {
-          message: `Found ${existing.length} existing releases. Next issue: #${nextIssue}. Fetching tickets since ${sinceDate}.`,
+          message: `Found ${existing.length} existing releases. Next issue: #${nextIssue}. Fetching tickets from the past 7 days (since ${sinceDate}).`,
         });
 
         // Step 2: Fetch from Linear
