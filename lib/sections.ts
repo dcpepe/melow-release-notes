@@ -6,6 +6,7 @@ export interface Section {
     type: "Video" | "Gif" | "Screenshot";
     src: string;
     caption?: string;
+    previewUrl?: string;
   };
   mediaSuggestion?: string;
   sourceUrl?: string;

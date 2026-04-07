@@ -199,15 +199,16 @@ export default function EditRelease() {
   }, [meta, sections, slug, editSlug, router, isNewDraft]);
 
   async function uploadFile(file: File, sectionId?: string) {
-    const targetSlug = editSlug || slug;
     setUploading(sectionId || "general");
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch(`/api/releases/${targetSlug}/upload`, {
-      method: "POST",
-      body: formData,
-    });
+    // Use temp upload for new drafts, release-specific upload for existing
+    const endpoint = isNewDraft
+      ? "/api/upload"
+      : `/api/releases/${editSlug || slug}/upload`;
+
+    const res = await fetch(endpoint, { method: "POST", body: formData });
     const result = await res.json();
     setUploading(null);
     setMediaFiles((prev) => [...prev, result.filename]);
@@ -246,10 +247,6 @@ export default function EditRelease() {
 
   async function handleMediaDrop(e: React.DragEvent, sectionIndex: number) {
     e.preventDefault();
-    if (isNewDraft) {
-      alert("Save the release first before uploading media.");
-      return;
-    }
     const file = e.dataTransfer.files[0];
     if (!file) return;
 
@@ -261,15 +258,11 @@ export default function EditRelease() {
     if (ext === "gif") type = "Gif";
 
     updateSection(sectionIndex, {
-      media: { type, src: result.src, caption: "" },
+      media: { type, src: result.src, caption: "", previewUrl: result.previewUrl || result.publicUrl },
     });
   }
 
   function handleMediaFileSelect(sectionIndex: number) {
-    if (isNewDraft) {
-      alert("Save the release first before uploading media.");
-      return;
-    }
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "video/*,image/*";
@@ -285,7 +278,7 @@ export default function EditRelease() {
       if (ext === "gif") type = "Gif";
 
       updateSection(sectionIndex, {
-        media: { type, src: result.src, caption: "" },
+        media: { type, src: result.src, caption: "", previewUrl: result.previewUrl || result.publicUrl },
       });
     };
     input.click();
@@ -363,14 +356,14 @@ export default function EditRelease() {
                     <figure className="my-4">
                       {s.media.type === "Video" ? (
                         <video
-                          src={`/releases/${editSlug}/${s.media.src.replace("./", "")}`}
+                          src={s.media.previewUrl || `/releases/${editSlug}/${s.media.src.replace("./", "")}`}
                           autoPlay muted loop playsInline
                           className="w-full rounded-lg"
                           style={{ border: "0.5px solid rgba(201, 162, 75, 0.15)" }}
                         />
                       ) : (
                         <img
-                          src={`/releases/${editSlug}/${s.media.src.replace("./", "")}`}
+                          src={s.media.previewUrl || `/releases/${editSlug}/${s.media.src.replace("./", "")}`}
                           alt={s.media.caption || ""}
                           className="w-full rounded-lg"
                           style={{ border: "0.5px solid rgba(201, 162, 75, 0.15)" }}
@@ -592,13 +585,13 @@ export default function EditRelease() {
                       <div className="rounded-lg overflow-hidden mb-2" style={{ border: "0.5px solid rgba(201, 162, 75, 0.15)" }}>
                         {section.media.type === "Video" ? (
                           <video
-                            src={`/releases/${editSlug}/${section.media.src.replace("./", "")}`}
+                            src={section.media.previewUrl || `/releases/${editSlug}/${section.media.src.replace("./", "")}`}
                             autoPlay muted loop playsInline
                             className="w-full"
                           />
                         ) : (
                           <img
-                            src={`/releases/${editSlug}/${section.media.src.replace("./", "")}`}
+                            src={section.media.previewUrl || `/releases/${editSlug}/${section.media.src.replace("./", "")}`}
                             alt=""
                             className="w-full"
                           />
@@ -640,13 +633,11 @@ export default function EditRelease() {
                             </p>
                           )}
                           <p className="text-sm text-text-tertiary mb-1">
-                            {isNewDraft ? "Save draft first, then upload media" : "Drop a video, GIF, or image here"}
+                            Drop a video, GIF, or image here
                           </p>
-                          {!isNewDraft && (
-                            <p className="text-xs text-text-tertiary">
-                              or click to browse
-                            </p>
-                          )}
+                          <p className="text-xs text-text-tertiary">
+                            or click to browse
+                          </p>
                         </>
                       )}
                     </div>
