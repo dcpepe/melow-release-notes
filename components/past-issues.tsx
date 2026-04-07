@@ -15,11 +15,11 @@ export default function PastIssues({
 }) {
   return (
     <section>
-      <h3 className="text-[10px] text-text-tertiary uppercase tracking-[0.15em] mb-8">
-        Past Issues
+      <h3 className="text-[13px] text-text-tertiary mb-6">
+        Past issues
       </h3>
       <div>
-        {releases.map((r, i) => {
+        {releases.map((r) => {
           const formattedDate = new Date(r.date).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -28,22 +28,16 @@ export default function PastIssues({
             <Link
               key={r.slug}
               href={`/release-notes/${r.slug}`}
-              className="group flex items-baseline gap-5 py-3.5 transition-colors -mx-3 px-3"
+              className="group flex items-baseline justify-between py-3 transition-colors"
               style={{
-                borderBottom: i < releases.length - 1 ? "0.5px solid rgba(201, 162, 75, 0.08)" : "none",
+                borderBottom: "0.5px solid rgba(201, 162, 75, 0.08)",
               }}
             >
-              <span className="text-[12px] text-text-tertiary tabular-nums w-16 shrink-0">
-                {formattedDate}
-              </span>
-              <span className="text-[12px] text-text-tertiary tabular-nums w-12 shrink-0">
-                #{String(r.issue).padStart(3, "0")}
-              </span>
-              <span className="text-[12px] text-text-tertiary tabular-nums w-16 shrink-0">
-                v{r.version}
-              </span>
-              <span className="text-[14px] text-text-secondary group-hover:text-text-primary transition-colors truncate">
+              <span className="text-[15px] text-text-secondary group-hover:text-text-primary transition-colors">
                 {r.headline}
+              </span>
+              <span className="text-[13px] text-text-tertiary tabular-nums shrink-0 ml-4">
+                {formattedDate}
               </span>
             </Link>
           );

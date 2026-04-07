@@ -6,8 +6,8 @@
   --surface: #141414;
   --border: rgba(201, 162, 75, 0.15);
   --text-primary: #f5f5f5;
-  --text-secondary: rgba(245, 245, 245, 0.65);
-  --text-tertiary: rgba(245, 245, 245, 0.4);
+  --text-secondary: rgba(245, 245, 245, 0.6);
+  --text-tertiary: rgba(245, 245, 245, 0.35);
   --gold: #c9a24b;
   --gold-muted: rgba(201, 162, 75, 0.55);
 }
@@ -25,10 +25,6 @@
   --font-sans: Arial, -apple-system, system-ui, sans-serif;
 }
 
-* {
-  box-sizing: border-box;
-}
-
 html {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -41,7 +37,7 @@ body {
 }
 
 ::selection {
-  background: rgba(201, 162, 75, 0.25);
+  background: rgba(201, 162, 75, 0.2);
   color: var(--text-primary);
 }
 
@@ -52,13 +48,13 @@ body {
 /* Prose styles for MDX content */
 .prose h2 {
   font-family: "Instrument Serif", serif;
-  font-size: 1.65rem;
+  font-size: 1.5rem;
   font-weight: 400;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
-  margin-top: 3.5rem;
+  margin-top: 3rem;
   margin-bottom: 0.75rem;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .prose h2:first-child {
@@ -67,26 +63,35 @@ body {
 
 .prose p {
   color: var(--text-secondary);
-  font-size: 1rem;
-  line-height: 1.75;
+  font-size: 0.9375rem;
+  line-height: 1.8;
   margin-bottom: 1.25rem;
 }
 
 .prose ul {
   color: var(--text-secondary);
-  font-size: 1rem;
-  line-height: 1.75;
-  list-style: disc;
-  padding-left: 1.25rem;
+  font-size: 0.9375rem;
+  line-height: 1.8;
+  list-style: none;
+  padding-left: 0;
   margin-bottom: 1.25rem;
 }
 
 .prose li {
   margin-bottom: 0.5rem;
+  padding-left: 1rem;
+  position: relative;
 }
 
-.prose li::marker {
-  color: var(--gold-muted);
+.prose li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.7em;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--gold-muted);
 }
 
 .prose strong {
