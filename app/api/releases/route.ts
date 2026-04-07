@@ -22,10 +22,8 @@ export async function POST(request: Request) {
   fs.mkdirSync(folderPath, { recursive: true });
 
   const frontmatter = { issue, version, date, headline, summary, tags: tags || [] };
-  const content = matter.stringify(
-    "## New section\n\nWrite your content here.\n",
-    frontmatter
-  );
+  const mdxBody = body.content || "## New section\n\nWrite your content here.\n";
+  const content = matter.stringify(mdxBody, frontmatter);
 
   fs.writeFileSync(path.join(folderPath, "index.mdx"), content, "utf-8");
 

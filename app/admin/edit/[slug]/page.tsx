@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { parseSections, serializeSections, Section } from "@/lib/sections";
 import Link from "next/link";
@@ -8,6 +8,7 @@ import Link from "next/link";
 export default function EditRelease() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
+  const isNew = slug === "new";
 
   const [meta, setMeta] = useState({
     issue: 0,
@@ -16,6 +17,7 @@ export default function EditRelease() {
     headline: "",
     summary: "",
     tags: [] as string[],
+    slug: "",
   });
   const [sections, setSections] = useState<Section[]>([]);
   const [mediaFiles, setMediaFiles] = useState<string[]>([]);
@@ -23,48 +25,109 @@ export default function EditRelease() {
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState<string | null>(null);
-  const [editSlug, setEditSlug] = useState(slug);
+  const [editSlug, setEditSlug] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [isNewDraft, setIsNewDraft] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/releases/${slug}`)
-      .then((r) => r.json())
-      .then((data) => {
-        setMeta(data.meta);
-        setSections(parseSections(data.content));
-        setMediaFiles(data.mediaFiles || []);
-        setEditSlug(data.meta.slug || slug);
-        setLoading(false);
-      });
-  }, [slug]);
+    if (isNew) {
+      // Load draft from sessionStorage
+      const raw = sessionStorage.getItem("melowDraft");
+      if (raw) {
+        const draft = JSON.parse(raw);
+        setMeta({ ...draft.meta, slug: draft.meta.slug || "draft" });
+        setEditSlug(draft.meta.slug || "draft");
+
+        const parsed: Section[] = draft.sections.map(
+          (s: { heading: string; body: string; mediaSuggestion?: string; sourceUrl?: string }, i: number) => ({
+            id: `s_${Date.now()}_${i}`,
+            heading: s.heading,
+            body: s.body,
+            media: undefined,
+            mediaSuggestion: s.mediaSuggestion || undefined,
+            sourceUrl: s.sourceUrl || undefined,
+          })
+        );
+        setSections(parsed);
+        setIsNewDraft(true);
+        sessionStorage.removeItem("melowDraft");
+      }
+      setLoading(false);
+    } else {
+      fetch(`/api/releases/${slug}`)
+        .then((r) => r.json())
+        .then((data) => {
+          setMeta({ ...data.meta, slug: data.meta.slug || slug });
+          setSections(parseSections(data.content));
+          setMediaFiles(data.mediaFiles || []);
+          setEditSlug(data.meta.slug || slug);
+          setLoading(false);
+        });
+    }
+  }, [slug, isNew]);
 
   const save = useCallback(async () => {
     setSaving(true);
     setSaved(false);
+
+    const targetSlug = editSlug || "draft";
     const content = serializeSections(sections);
-    await fetch(`/api/releases/${slug}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        meta,
-        content,
-        newSlug: editSlug !== slug ? editSlug : undefined,
-      }),
-    });
-    setSaving(false);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-    if (editSlug !== slug) {
-      router.push(`/admin/edit/${editSlug}`);
+
+    if (isNewDraft) {
+      // Create new release via POST
+      const res = await fetch("/api/releases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          issue: meta.issue,
+          version: meta.version,
+          date: meta.date,
+          headline: meta.headline,
+          summary: meta.summary,
+          slug: targetSlug,
+          tags: meta.tags,
+          content,
+        }),
+      });
+      const result = await res.json();
+      setIsNewDraft(false);
+      setSaving(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      router.push(`/admin/edit/${targetSlug}`);
+    } else {
+      await fetch(`/api/releases/${slug}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          meta: {
+            issue: meta.issue,
+            version: meta.version,
+            date: meta.date,
+            headline: meta.headline,
+            summary: meta.summary,
+            tags: meta.tags,
+          },
+          content,
+          newSlug: targetSlug !== slug ? targetSlug : undefined,
+        }),
+      });
+      setSaving(false);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      if (targetSlug !== slug) {
+        router.push(`/admin/edit/${targetSlug}`);
+      }
     }
-  }, [meta, sections, slug, editSlug, router]);
+  }, [meta, sections, slug, editSlug, router, isNewDraft]);
 
   async function uploadFile(file: File, sectionId?: string) {
+    const targetSlug = editSlug || slug;
     setUploading(sectionId || "general");
     const formData = new FormData();
     formData.append("file", file);
 
-    const res = await fetch(`/api/releases/${slug}/upload`, {
+    const res = await fetch(`/api/releases/${targetSlug}/upload`, {
       method: "POST",
       body: formData,
     });
@@ -106,6 +169,10 @@ export default function EditRelease() {
 
   async function handleMediaDrop(e: React.DragEvent, sectionIndex: number) {
     e.preventDefault();
+    if (isNewDraft) {
+      alert("Save the release first before uploading media.");
+      return;
+    }
     const file = e.dataTransfer.files[0];
     if (!file) return;
 
@@ -117,15 +184,15 @@ export default function EditRelease() {
     if (ext === "gif") type = "Gif";
 
     updateSection(sectionIndex, {
-      media: {
-        type,
-        src: result.src,
-        caption: "",
-      },
+      media: { type, src: result.src, caption: "" },
     });
   }
 
   function handleMediaFileSelect(sectionIndex: number) {
+    if (isNewDraft) {
+      alert("Save the release first before uploading media.");
+      return;
+    }
     const input = document.createElement("input");
     input.type = "file";
     input.accept = "video/*,image/*";
@@ -141,11 +208,7 @@ export default function EditRelease() {
       if (ext === "gif") type = "Gif";
 
       updateSection(sectionIndex, {
-        media: {
-          type,
-          src: result.src,
-          caption: "",
-        },
+        media: { type, src: result.src, caption: "" },
       });
     };
     input.click();
@@ -170,7 +233,7 @@ export default function EditRelease() {
             </Link>
             <span className="text-text-tertiary">/</span>
             <span className="text-sm text-text-secondary">
-              #{String(meta.issue).padStart(3, "0")}
+              {isNewDraft ? "New draft" : `#${String(meta.issue).padStart(3, "0")}`}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -180,22 +243,36 @@ export default function EditRelease() {
             >
               {showPreview ? "Editor" : "Preview"}
             </button>
-            <a
-              href={`/release-notes/${editSlug}`}
-              target="_blank"
-              className="text-sm text-text-secondary hover:text-text-primary px-3 py-1.5 rounded border border-border transition-colors"
-            >
-              View live
-            </a>
+            {!isNewDraft && (
+              <a
+                href={`/release-notes/${editSlug}`}
+                target="_blank"
+                className="text-sm text-text-secondary hover:text-text-primary px-3 py-1.5 rounded border border-border transition-colors"
+              >
+                View live
+              </a>
+            )}
             <button
               onClick={save}
               disabled={saving}
               className="text-sm text-bg bg-gold px-4 py-1.5 rounded hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-              {saving ? "Saving..." : saved ? "Saved" : "Save"}
+              {saving ? "Saving..." : saved ? "Saved" : isNewDraft ? "Save draft" : "Save"}
             </button>
           </div>
         </div>
+
+        {/* AI-generated banner for new drafts */}
+        {isNewDraft && (
+          <div
+            className="mb-6 p-4 rounded-lg"
+            style={{ background: "rgba(201, 162, 75, 0.08)", border: "0.5px solid rgba(201, 162, 75, 0.2)" }}
+          >
+            <p className="text-sm text-gold">
+              This draft was generated from your Linear tickets. Edit the headline, tweak the copy, then save.
+            </p>
+          </div>
+        )}
 
         {showPreview ? (
           /* Preview mode */
@@ -212,9 +289,13 @@ export default function EditRelease() {
               {sections.map((s) => (
                 <div key={s.id} className="mb-8">
                   {s.heading && <h2>{s.heading}</h2>}
-                  {s.body.split("\n\n").map((p, i) => (
-                    <p key={i}>{p}</p>
-                  ))}
+                  {s.body.split("\n").map((line, i) => {
+                    if (line.startsWith("- ")) {
+                      return <li key={i}>{line.slice(2)}</li>;
+                    }
+                    if (line.trim()) return <p key={i}>{line}</p>;
+                    return null;
+                  })}
                   {s.media && (
                     <figure className="my-4">
                       {s.media.type === "Video" ? (
@@ -338,7 +419,6 @@ export default function EditRelease() {
                         onClick={() => moveSection(index, -1)}
                         disabled={index === 0}
                         className="text-text-tertiary hover:text-text-primary disabled:opacity-20 px-2 py-1 text-sm transition-colors"
-                        title="Move up"
                       >
                         Up
                       </button>
@@ -346,7 +426,6 @@ export default function EditRelease() {
                         onClick={() => moveSection(index, 1)}
                         disabled={index === sections.length - 1}
                         className="text-text-tertiary hover:text-text-primary disabled:opacity-20 px-2 py-1 text-sm transition-colors"
-                        title="Move down"
                       >
                         Down
                       </button>
@@ -430,11 +509,13 @@ export default function EditRelease() {
                             </p>
                           )}
                           <p className="text-sm text-text-tertiary mb-1">
-                            Drop a video, GIF, or image here
+                            {isNewDraft ? "Save draft first, then upload media" : "Drop a video, GIF, or image here"}
                           </p>
-                          <p className="text-xs text-text-tertiary">
-                            or click to browse
-                          </p>
+                          {!isNewDraft && (
+                            <p className="text-xs text-text-tertiary">
+                              or click to browse
+                            </p>
+                          )}
                         </>
                       )}
                     </div>

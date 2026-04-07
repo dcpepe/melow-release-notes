@@ -1,13 +1,10 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
-import matter from "gray-matter";
 import Anthropic from "@anthropic-ai/sdk";
 import { fetchCompletedTickets, groupTicketsByLabel } from "@/lib/linear";
 import { rewriteTicket } from "@/lib/rewrite";
 import { getAllReleases } from "@/lib/releases";
 
-const RELEASES_DIR = path.join(process.cwd(), "content", "releases");
+export const maxDuration = 60;
 
 function bumpVersion(version: string): string {
   const parts = version.split(".");
@@ -56,8 +53,7 @@ Respond as JSON: {"headline": "...", "summary": "...", "slug": "..."}`,
   try {
     const block = message.content[0];
     if (block.type === "text") {
-      const parsed = JSON.parse(block.text);
-      return parsed;
+      return JSON.parse(block.text);
     }
   } catch {
     // fall through
@@ -70,11 +66,7 @@ Respond as JSON: {"headline": "...", "summary": "...", "slug": "..."}`,
   };
 }
 
-function suggestMedia(
-  heading: string,
-  body: string,
-  label: string
-): string {
+function suggestMedia(heading: string, body: string, label: string): string {
   const lower = `${heading} ${body}`.toLowerCase();
 
   if (lower.includes("chart") || lower.includes("visual") || lower.includes("graph")) {
@@ -112,30 +104,28 @@ export async function POST() {
   try {
     tickets = await fetchCompletedTickets(sinceDate);
   } catch (err) {
-    // If Linear fails, create an empty draft
-    const folderName = `${String(nextIssue).padStart(3, "0")}-draft`;
-    const folderPath = path.join(RELEASES_DIR, folderName);
-    fs.mkdirSync(folderPath, { recursive: true });
-
-    const frontmatter = {
-      issue: nextIssue,
-      version: nextVersion,
-      date: today,
-      headline: "What shipped this week",
-      summary: "Write your summary here.",
-      tags: [],
-    };
-    const content = matter.stringify(
-      "## New section\n\nWrite your content here.\n",
-      frontmatter
-    );
-    fs.writeFileSync(path.join(folderPath, "index.mdx"), content, "utf-8");
-
     return NextResponse.json({
-      slug: "draft",
-      folder: folderName,
       ticketCount: 0,
-      error: `Linear fetch failed: ${err instanceof Error ? err.message : "unknown error"}. Created empty draft.`,
+      error: `Linear fetch failed: ${err instanceof Error ? err.message : "unknown error"}. Check your LINEAR_API_KEY.`,
+      // Return draft data so the editor can still work
+      draft: {
+        meta: {
+          issue: nextIssue,
+          version: nextVersion,
+          date: today,
+          headline: "What shipped this week",
+          summary: "Write your summary here.",
+          tags: [],
+        },
+        sections: [
+          {
+            heading: "New section",
+            body: "Write your content here.",
+            mediaSuggestion: "",
+            sourceUrl: "",
+          },
+        ],
+      },
     });
   }
 
@@ -170,7 +160,6 @@ export async function POST() {
         ticket.description || ""
       );
 
-      // Generate a customer-facing heading from the rewritten body
       const heading = ticket.title
         .replace(/^\[.*?\]\s*/, "")
         .replace(/^(feat|fix|chore|refactor):\s*/i, "");
@@ -191,28 +180,6 @@ export async function POST() {
   const { headline, summary, slug } =
     await generateHeadlineAndSummary(rewrittenSections);
 
-  // Build MDX content
-  let mdx = "";
-
-  // Feature sections
-  for (const section of rewrittenSections) {
-    mdx += `## ${section.heading}\n\n`;
-    mdx += `${section.body}\n\n`;
-    if (section.mediaSuggestion) {
-      mdx += `{/* Media suggestion: ${section.mediaSuggestion} */}\n`;
-      mdx += `{/* Source: ${section.ticketUrl} */}\n\n`;
-    }
-  }
-
-  // Fixes section
-  if (fixesList.length > 0) {
-    mdx += `## Also shipped\n\n`;
-    for (const fix of fixesList) {
-      mdx += `- ${fix.body}\n`;
-    }
-    mdx += "\n";
-  }
-
   // Determine tags
   const tags = [
     ...new Set(
@@ -222,37 +189,36 @@ export async function POST() {
     ),
   ];
 
-  // Write to disk
-  const folderName = `${String(nextIssue).padStart(3, "0")}-${slug}`;
-  const folderPath = path.join(RELEASES_DIR, folderName);
-  fs.mkdirSync(folderPath, { recursive: true });
+  // Build sections for the editor (including fixes as a section)
+  const editorSections = rewrittenSections.map((s) => ({
+    heading: s.heading,
+    body: s.body,
+    mediaSuggestion: s.mediaSuggestion,
+    sourceUrl: s.ticketUrl,
+  }));
 
-  const frontmatter = {
-    issue: nextIssue,
-    version: nextVersion,
-    date: today,
-    headline,
-    summary,
-    tags,
-  };
-
-  const fullContent = matter.stringify(mdx, frontmatter);
-  fs.writeFileSync(path.join(folderPath, "index.mdx"), fullContent, "utf-8");
-
-  // Build media suggestions for the UI
-  const mediaSuggestions = rewrittenSections
-    .filter((s) => s.mediaSuggestion)
-    .map((s) => ({
-      section: s.heading,
-      suggestion: s.mediaSuggestion,
-    }));
+  if (fixesList.length > 0) {
+    editorSections.push({
+      heading: "Also shipped",
+      body: fixesList.map((f) => `- ${f.body}`).join("\n"),
+      mediaSuggestion: "",
+      sourceUrl: "",
+    });
+  }
 
   return NextResponse.json({
-    slug,
-    folder: folderName,
     ticketCount: tickets.length,
-    headline,
-    summary,
-    mediaSuggestions,
+    draft: {
+      meta: {
+        issue: nextIssue,
+        version: nextVersion,
+        date: today,
+        headline,
+        summary,
+        slug,
+        tags,
+      },
+      sections: editorSections,
+    },
   });
 }

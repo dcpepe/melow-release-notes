@@ -30,7 +30,7 @@ export default function AdminDashboard() {
 
   async function handleNewRelease() {
     setGenerating(true);
-    setGenStatus("Fetching shipped tickets from Linear...");
+    setGenStatus("Fetching shipped tickets from Linear and rewriting with Claude...");
 
     try {
       const res = await fetch("/api/releases/draft", { method: "POST" });
@@ -38,21 +38,27 @@ export default function AdminDashboard() {
 
       if (result.error) {
         setGenStatus(result.error);
-        setTimeout(() => {
-          window.location.href = `/admin/edit/${result.slug}`;
-        }, 2000);
-        return;
       }
 
-      setGenStatus(
-        `Done. ${result.ticketCount} tickets rewritten. Headline: "${result.headline}"`
-      );
+      if (result.draft) {
+        // Store draft in sessionStorage for the editor to pick up
+        sessionStorage.setItem("melowDraft", JSON.stringify(result.draft));
 
-      setTimeout(() => {
-        window.location.href = `/admin/edit/${result.slug}`;
-      }, 1500);
-    } catch (err) {
-      setGenStatus("Something went wrong. Check your API keys.");
+        setGenStatus(
+          result.ticketCount > 0
+            ? `Done. ${result.ticketCount} tickets rewritten. Opening editor...`
+            : "Created empty draft. Opening editor..."
+        );
+
+        setTimeout(() => {
+          window.location.href = "/admin/edit/new";
+        }, 1000);
+      } else {
+        setGenStatus("Something went wrong. No draft was generated.");
+        setGenerating(false);
+      }
+    } catch {
+      setGenStatus("Request failed. Check your API keys in Vercel environment variables.");
       setGenerating(false);
     }
   }
