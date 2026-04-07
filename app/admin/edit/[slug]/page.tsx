@@ -28,27 +28,30 @@ export default function EditRelease() {
   const [editSlug, setEditSlug] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [isNewDraft, setIsNewDraft] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genStatus, setGenStatus] = useState("");
 
   useEffect(() => {
     if (isNew) {
-      // Load draft from sessionStorage
       const raw = sessionStorage.getItem("melowDraft");
       if (raw) {
         const draft = JSON.parse(raw);
         setMeta({ ...draft.meta, slug: draft.meta.slug || "draft" });
         setEditSlug(draft.meta.slug || "draft");
 
-        const parsed: Section[] = draft.sections.map(
-          (s: { heading: string; body: string; mediaSuggestion?: string; sourceUrl?: string }, i: number) => ({
-            id: `s_${Date.now()}_${i}`,
-            heading: s.heading,
-            body: s.body,
-            media: undefined,
-            mediaSuggestion: s.mediaSuggestion || undefined,
-            sourceUrl: s.sourceUrl || undefined,
-          })
-        );
-        setSections(parsed);
+        if (draft.sections && draft.sections.length > 0) {
+          const parsed: Section[] = draft.sections.map(
+            (s: { heading: string; body: string; mediaSuggestion?: string; sourceUrl?: string }, i: number) => ({
+              id: `s_${Date.now()}_${i}`,
+              heading: s.heading,
+              body: s.body,
+              media: undefined,
+              mediaSuggestion: s.mediaSuggestion || undefined,
+              sourceUrl: s.sourceUrl || undefined,
+            })
+          );
+          setSections(parsed);
+        }
         setIsNewDraft(true);
         sessionStorage.removeItem("melowDraft");
       }
@@ -66,6 +69,54 @@ export default function EditRelease() {
     }
   }, [slug, isNew]);
 
+  async function generateFromLinear() {
+    setGenerating(true);
+    setGenStatus("Fetching tickets from Linear...");
+
+    try {
+      const res = await fetch("/api/releases/draft", { method: "POST" });
+      const result = await res.json();
+
+      if (result.error) {
+        setGenStatus(result.error);
+      }
+
+      if (result.draft) {
+        setMeta((prev) => ({
+          ...prev,
+          headline: result.draft.meta.headline || prev.headline,
+          summary: result.draft.meta.summary || prev.summary,
+          tags: result.draft.meta.tags || prev.tags,
+        }));
+        setEditSlug(result.draft.meta.slug || editSlug);
+
+        if (result.draft.sections && result.draft.sections.length > 0) {
+          const newSections: Section[] = result.draft.sections.map(
+            (s: { heading: string; body: string; mediaSuggestion?: string; sourceUrl?: string }, i: number) => ({
+              id: `s_gen_${Date.now()}_${i}`,
+              heading: s.heading,
+              body: s.body,
+              media: undefined,
+              mediaSuggestion: s.mediaSuggestion || undefined,
+              sourceUrl: s.sourceUrl || undefined,
+            })
+          );
+          setSections(newSections);
+        }
+
+        setGenStatus(
+          result.ticketCount > 0
+            ? `Generated from ${result.ticketCount} tickets. Edit and save when ready.`
+            : ""
+        );
+      }
+    } catch {
+      setGenStatus("Failed to connect. Check API keys in Vercel settings.");
+    }
+
+    setGenerating(false);
+  }
+
   const save = useCallback(async () => {
     setSaving(true);
     setSaved(false);
@@ -74,8 +125,7 @@ export default function EditRelease() {
     const content = serializeSections(sections);
 
     if (isNewDraft) {
-      // Create new release via POST
-      const res = await fetch("/api/releases", {
+      await fetch("/api/releases", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -89,7 +139,6 @@ export default function EditRelease() {
           content,
         }),
       });
-      const result = await res.json();
       setIsNewDraft(false);
       setSaving(false);
       setSaved(true);
@@ -262,18 +311,6 @@ export default function EditRelease() {
           </div>
         </div>
 
-        {/* AI-generated banner for new drafts */}
-        {isNewDraft && (
-          <div
-            className="mb-6 p-4 rounded-lg"
-            style={{ background: "rgba(201, 162, 75, 0.08)", border: "0.5px solid rgba(201, 162, 75, 0.2)" }}
-          >
-            <p className="text-sm text-gold">
-              This draft was generated from your Linear tickets. Edit the headline, tweak the copy, then save.
-            </p>
-          </div>
-        )}
-
         {showPreview ? (
           /* Preview mode */
           <div className="rounded-lg p-8" style={{ background: "#161616", border: "0.5px solid rgba(201, 162, 75, 0.15)" }}>
@@ -282,7 +319,7 @@ export default function EditRelease() {
               {meta.date} | Issue #{String(meta.issue).padStart(3, "0")} | v{meta.version}
             </p>
             <h1 className="font-serif text-4xl text-text-primary mb-4" style={{ letterSpacing: "-0.02em", lineHeight: 1.1 }}>
-              {meta.headline}<span className="text-gold">.</span>
+              {meta.headline || "Untitled"}<span className="text-gold">.</span>
             </h1>
             <p className="text-text-secondary mb-10">{meta.summary}</p>
             <div className="prose">
@@ -290,9 +327,7 @@ export default function EditRelease() {
                 <div key={s.id} className="mb-8">
                   {s.heading && <h2>{s.heading}</h2>}
                   {s.body.split("\n").map((line, i) => {
-                    if (line.startsWith("- ")) {
-                      return <li key={i}>{line.slice(2)}</li>;
-                    }
+                    if (line.startsWith("- ")) return <li key={i}>{line.slice(2)}</li>;
                     if (line.trim()) return <p key={i}>{line}</p>;
                     return null;
                   })}
@@ -325,6 +360,52 @@ export default function EditRelease() {
         ) : (
           /* Editor mode */
           <>
+            {/* Generate from Linear button */}
+            {sections.length === 0 && !generating && (
+              <div
+                className="mb-6 p-6 rounded-lg text-center"
+                style={{ background: "#161616", border: "0.5px solid rgba(201, 162, 75, 0.15)" }}
+              >
+                <p className="text-sm text-text-secondary mb-4">
+                  Pull shipped tickets from Linear and auto-generate your release notes with AI.
+                </p>
+                <button
+                  onClick={generateFromLinear}
+                  className="text-sm text-bg bg-gold px-5 py-2 rounded hover:opacity-90 transition-opacity"
+                >
+                  Generate from Linear
+                </button>
+                <p className="text-xs text-text-tertiary mt-3">
+                  Or add sections manually below.
+                </p>
+              </div>
+            )}
+
+            {/* Generation status */}
+            {(generating || genStatus) && (
+              <div
+                className="mb-6 p-4 rounded-lg"
+                style={{ background: "rgba(201, 162, 75, 0.08)", border: "0.5px solid rgba(201, 162, 75, 0.2)" }}
+              >
+                <div className="flex items-center gap-3">
+                  {generating && (
+                    <div
+                      className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full shrink-0"
+                      style={{ animation: "spin 0.8s linear infinite" }}
+                    />
+                  )}
+                  <div>
+                    <p className="text-sm text-gold">{genStatus}</p>
+                    {generating && (
+                      <p className="text-xs text-text-tertiary mt-1">
+                        This may take 15-30 seconds.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Meta fields */}
             <div
               className="rounded-lg p-6 mb-6"
@@ -336,6 +417,7 @@ export default function EditRelease() {
                   <input
                     value={meta.headline}
                     onChange={(e) => setMeta({ ...meta, headline: e.target.value })}
+                    placeholder="AI will generate this, or type your own"
                     className="w-full bg-bg border border-border rounded px-3 py-2 text-text-primary text-lg font-serif focus:outline-none focus:border-gold"
                     style={{ letterSpacing: "-0.01em" }}
                   />
@@ -345,6 +427,7 @@ export default function EditRelease() {
                   <textarea
                     value={meta.summary}
                     onChange={(e) => setMeta({ ...meta, summary: e.target.value })}
+                    placeholder="AI will generate this, or type your own"
                     rows={2}
                     className="w-full bg-bg border border-border rounded px-3 py-2 text-text-primary text-sm focus:outline-none focus:border-gold resize-none"
                   />
@@ -388,6 +471,19 @@ export default function EditRelease() {
               </div>
             </div>
 
+            {/* Generate button when sections exist */}
+            {sections.length > 0 && (
+              <div className="mb-6 flex justify-end">
+                <button
+                  onClick={generateFromLinear}
+                  disabled={generating}
+                  className="text-xs text-text-tertiary hover:text-gold px-3 py-1.5 rounded border border-border hover:border-gold/30 transition-colors disabled:opacity-50"
+                >
+                  {generating ? "Generating..." : "Regenerate from Linear"}
+                </button>
+              </div>
+            )}
+
             {/* Sections */}
             <div className="space-y-4 mb-6">
               {sections.map((section, index) => (
@@ -396,7 +492,6 @@ export default function EditRelease() {
                   className="rounded-lg p-6"
                   style={{ background: "#161616", border: "0.5px solid rgba(201, 162, 75, 0.15)" }}
                 >
-                  {/* Section controls */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-3">
                       <span className="text-xs text-text-tertiary">
@@ -438,7 +533,6 @@ export default function EditRelease() {
                     </div>
                   </div>
 
-                  {/* Heading */}
                   <input
                     value={section.heading}
                     onChange={(e) => updateSection(index, { heading: e.target.value })}
@@ -446,7 +540,6 @@ export default function EditRelease() {
                     className="w-full bg-bg border border-border rounded px-3 py-2 text-text-primary font-serif text-lg mb-3 focus:outline-none focus:border-gold"
                   />
 
-                  {/* Body */}
                   <textarea
                     value={section.body}
                     onChange={(e) => updateSection(index, { body: e.target.value })}
@@ -455,7 +548,6 @@ export default function EditRelease() {
                     className="w-full bg-bg border border-border rounded px-3 py-2 text-text-secondary text-sm mb-3 focus:outline-none focus:border-gold resize-y"
                   />
 
-                  {/* Media */}
                   {section.media ? (
                     <div className="relative">
                       <div className="rounded-lg overflow-hidden mb-2" style={{ border: "0.5px solid rgba(201, 162, 75, 0.15)" }}>
@@ -524,7 +616,6 @@ export default function EditRelease() {
               ))}
             </div>
 
-            {/* Add section */}
             <button
               onClick={addSection}
               className="w-full py-3 text-sm text-text-tertiary hover:text-gold border border-dashed border-border hover:border-gold/40 rounded-lg transition-colors"
@@ -534,6 +625,14 @@ export default function EditRelease() {
           </>
         )}
       </div>
+
+      <style jsx>{`
+        @keyframes spin {
+          to {
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </div>
   );
 }

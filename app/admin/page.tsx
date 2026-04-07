@@ -16,8 +16,6 @@ interface Release {
 export default function AdminDashboard() {
   const [releases, setReleases] = useState<Release[]>([]);
   const [loading, setLoading] = useState(true);
-  const [generating, setGenerating] = useState(false);
-  const [genStatus, setGenStatus] = useState("");
 
   useEffect(() => {
     fetch("/api/releases")
@@ -28,39 +26,28 @@ export default function AdminDashboard() {
       });
   }, []);
 
-  async function handleNewRelease() {
-    setGenerating(true);
-    setGenStatus("Fetching shipped tickets from Linear and rewriting with Claude...");
+  function handleNewRelease() {
+    const nextIssue = releases.length > 0 ? releases[0].issue + 1 : 1;
+    const lastVersion = releases.length > 0 ? releases[0].version : "1.0.0";
+    const parts = lastVersion.split(".");
+    const nextVersion = `${parts[0]}.${parts[1]}.${parseInt(parts[2] || "0") + 1}`;
+    const today = new Date().toISOString().split("T")[0];
 
-    try {
-      const res = await fetch("/api/releases/draft", { method: "POST" });
-      const result = await res.json();
+    const draft = {
+      meta: {
+        issue: nextIssue,
+        version: nextVersion,
+        date: today,
+        headline: "",
+        summary: "",
+        slug: "draft",
+        tags: [],
+      },
+      sections: [],
+    };
 
-      if (result.error) {
-        setGenStatus(result.error);
-      }
-
-      if (result.draft) {
-        // Store draft in sessionStorage for the editor to pick up
-        sessionStorage.setItem("melowDraft", JSON.stringify(result.draft));
-
-        setGenStatus(
-          result.ticketCount > 0
-            ? `Done. ${result.ticketCount} tickets rewritten. Opening editor...`
-            : "Created empty draft. Opening editor..."
-        );
-
-        setTimeout(() => {
-          window.location.href = "/admin/edit/new";
-        }, 1000);
-      } else {
-        setGenStatus("Something went wrong. No draft was generated.");
-        setGenerating(false);
-      }
-    } catch {
-      setGenStatus("Request failed. Check your API keys in Vercel environment variables.");
-      setGenerating(false);
-    }
+    sessionStorage.setItem("melowDraft", JSON.stringify(draft));
+    window.location.href = "/admin/edit/new";
   }
 
   return (
@@ -72,49 +59,18 @@ export default function AdminDashboard() {
           </h1>
           <button
             onClick={handleNewRelease}
-            disabled={generating}
-            className="text-sm text-bg bg-gold px-4 py-2 rounded hover:opacity-90 transition-opacity disabled:opacity-70"
+            className="text-sm text-bg bg-gold px-4 py-2 rounded hover:opacity-90 transition-opacity"
           >
-            {generating ? "Generating..." : "New Release"}
+            New Release
           </button>
         </div>
-
-        {/* Generation status */}
-        {genStatus && (
-          <div
-            className="mb-8 p-5 rounded-lg"
-            style={{
-              background: "#161616",
-              border: "0.5px solid rgba(201, 162, 75, 0.15)",
-            }}
-          >
-            <div className="flex items-start gap-3">
-              {generating && (
-                <div
-                  className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full shrink-0 mt-0.5"
-                  style={{ animation: "spin 0.8s linear infinite" }}
-                />
-              )}
-              <div>
-                <p className="text-sm text-text-secondary">{genStatus}</p>
-                {generating && (
-                  <p className="text-xs text-text-tertiary mt-2">
-                    Pulling tickets from Linear, rewriting each one with Claude,
-                    generating headline and summary. This takes 15-30 seconds.
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Releases list */}
         {loading ? (
           <p className="text-text-tertiary text-sm">Loading...</p>
         ) : releases.length === 0 ? (
           <p className="text-text-tertiary text-sm">
-            No releases yet. Click "New Release" to pull tickets from Linear and
-            generate your first draft.
+            No releases yet. Click "New Release" to get started.
           </p>
         ) : (
           <div>
@@ -152,14 +108,6 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
-
-      <style jsx>{`
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
     </div>
   );
 }
