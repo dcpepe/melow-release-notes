@@ -3,7 +3,7 @@ export interface Section {
   heading: string;
   body: string;
   media?: {
-    type: "Video" | "Gif" | "Screenshot";
+    type: "Video" | "Gif" | "Screenshot" | "Audio";
     src: string;
     caption?: string;
     previewUrl?: string;

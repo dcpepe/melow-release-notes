@@ -1,28 +1,38 @@
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
+import { handleUpload } from "@vercel/blob/client";
 
 export async function POST(request: Request) {
+  const body = await request.json();
+
   try {
-    const formData = await request.formData();
-    const file = formData.get("file") as File | null;
-    if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
-
-    // Upload to Vercel Blob for persistent storage
-    const blob = await put(`releases/${file.name}`, file, {
-      access: "public",
-      addRandomSuffix: true,
+    const jsonResponse = await handleUpload({
+      body,
+      request,
+      onBeforeGenerateToken: async () => {
+        return {
+          allowedContentTypes: [
+            "video/mp4",
+            "video/webm",
+            "video/quicktime",
+            "audio/mpeg",
+            "audio/mp3",
+            "image/gif",
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/svg+xml",
+          ],
+          maximumSizeInBytes: 100 * 1024 * 1024, // 100MB
+        };
+      },
+      onUploadCompleted: async () => {},
     });
 
-    return NextResponse.json({
-      filename: file.name,
-      src: `./${file.name}`,
-      previewUrl: blob.url,
-      blobUrl: blob.url,
-    });
+    return NextResponse.json(jsonResponse);
   } catch (err) {
     return NextResponse.json(
       { error: `Upload failed: ${err instanceof Error ? err.message : "unknown"}` },
-      { status: 500 }
+      { status: 400 }
     );
   }
 }

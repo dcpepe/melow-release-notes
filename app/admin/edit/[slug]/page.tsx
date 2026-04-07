@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { parseSections, serializeSections, Section } from "@/lib/sections";
 import RichEditor from "@/components/admin/rich-editor";
+import MediaUpload from "@/components/admin/media-upload";
 import Link from "next/link";
 
 export default function EditRelease() {
@@ -25,7 +26,6 @@ export default function EditRelease() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState<string | null>(null);
   const [editSlug, setEditSlug] = useState("");
   const [showPreview, setShowPreview] = useState(false);
   const [isNewDraft, setIsNewDraft] = useState(false);
@@ -218,32 +218,6 @@ export default function EditRelease() {
     }
   }, [meta, sections, slug, editSlug, router, isNewDraft]);
 
-  async function uploadFile(file: File, sectionId?: string) {
-    setUploading(sectionId || "general");
-    const formData = new FormData();
-    formData.append("file", file);
-
-    // Use temp upload for new drafts, release-specific upload for existing
-    const endpoint = isNewDraft
-      ? "/api/upload"
-      : `/api/releases/${editSlug || slug}/upload`;
-
-    try {
-      const res = await fetch(endpoint, { method: "POST", body: formData });
-      if (!res.ok) {
-        setUploading(null);
-        return null;
-      }
-      const result = await res.json();
-      setUploading(null);
-      setMediaFiles((prev) => [...prev, result.filename]);
-      return result;
-    } catch {
-      setUploading(null);
-      return null;
-    }
-  }
-
   function moveSection(index: number, direction: -1 | 1) {
     const target = index + direction;
     if (target < 0 || target >= sections.length) return;
@@ -272,42 +246,6 @@ export default function EditRelease() {
         media: undefined,
       },
     ]);
-  }
-
-  async function handleMediaUpload(file: File, sectionIndex: number) {
-    const result = await uploadFile(file, sections[sectionIndex].id);
-    if (!result) return;
-
-    const ext = file.name.split(".").pop()?.toLowerCase();
-    let type: "Video" | "Gif" | "Screenshot" = "Screenshot";
-    if (ext === "mp4" || ext === "webm") type = "Video";
-    if (ext === "gif") type = "Gif";
-
-    // For temp uploads, use the previewUrl. For release uploads, build the public path.
-    const previewUrl = result.previewUrl || `/releases/${editSlug}/${file.name}`;
-
-    updateSection(sectionIndex, {
-      media: { type, src: `./${file.name}`, caption: "", previewUrl },
-    });
-  }
-
-  async function handleMediaDrop(e: React.DragEvent, sectionIndex: number) {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-    await handleMediaUpload(file, sectionIndex);
-  }
-
-  function handleMediaFileSelect(sectionIndex: number) {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "video/*,image/*";
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      await handleMediaUpload(file, sectionIndex);
-    };
-    input.click();
   }
 
   if (loading) {
@@ -648,6 +586,12 @@ export default function EditRelease() {
                             autoPlay muted loop playsInline
                             className="w-full"
                           />
+                        ) : section.media.type === "Audio" ? (
+                          <audio
+                            src={section.media.previewUrl || `/releases/${editSlug}/${section.media.src.replace("./", "")}`}
+                            controls
+                            className="w-full p-4"
+                          />
                         ) : (
                           <img
                             src={section.media.previewUrl || `/releases/${editSlug}/${section.media.src.replace("./", "")}`}
@@ -676,30 +620,19 @@ export default function EditRelease() {
                       </div>
                     </div>
                   ) : (
-                    <div
-                      onDragOver={(e) => e.preventDefault()}
-                      onDrop={(e) => handleMediaDrop(e, index)}
-                      onClick={() => handleMediaFileSelect(index)}
-                      className="border border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-gold/40 transition-colors"
-                    >
-                      {uploading === section.id ? (
-                        <p className="text-sm text-gold">Uploading...</p>
-                      ) : (
-                        <>
-                          {section.mediaSuggestion && (
-                            <p className="text-sm text-gold mb-3">
-                              Suggestion: {section.mediaSuggestion}
-                            </p>
-                          )}
-                          <p className="text-sm text-text-tertiary mb-1">
-                            Drop a video, GIF, or image here
-                          </p>
-                          <p className="text-xs text-text-tertiary">
-                            or click to browse
-                          </p>
-                        </>
-                      )}
-                    </div>
+                    <MediaUpload
+                      mediaSuggestion={section.mediaSuggestion}
+                      onUploaded={(result) => {
+                        updateSection(index, {
+                          media: {
+                            type: result.type === "Audio" ? "Video" : result.type,
+                            src: `./${result.filename}`,
+                            caption: "",
+                            previewUrl: result.url,
+                          },
+                        });
+                      }}
+                    />
                   )}
                 </div>
               ))}
