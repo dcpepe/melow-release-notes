@@ -30,6 +30,14 @@ export default function EditRelease() {
   const [showPreview, setShowPreview] = useState(false);
   const [isNewDraft, setIsNewDraft] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  function copyPreviewLink() {
+    const url = `${window.location.origin}/preview/${editSlug}`;
+    navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
   const [genSteps, setGenSteps] = useState<string[]>([]);
 
   useEffect(() => {
@@ -367,6 +375,12 @@ export default function EditRelease() {
                   className="text-sm text-text-tertiary hover:text-text-primary px-3 py-1.5 rounded border border-border transition-colors"
                 >
                   Back to editing
+                </button>
+                <button
+                  onClick={copyPreviewLink}
+                  className="text-sm text-gold hover:text-text-primary px-3 py-1.5 rounded border border-gold/30 transition-colors"
+                >
+                  {copied ? "Link copied!" : "Share with team"}
                 </button>
                 <a
                   href={`/release-notes/${editSlug}`}
