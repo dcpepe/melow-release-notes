@@ -38,14 +38,19 @@ export default async function PreviewPage({
       slug: r.slug,
     }));
 
-  const contentWithFixedPaths = release.content.replace(
+  let processedContent = release.content.replace(
     /src="\.\/([^"]+)"/g,
     `src="/releases/${slug}/$1"`
   );
 
+  processedContent = processedContent.replace(
+    /^\*\*(.+?)\*\*$/gm,
+    "$1"
+  );
+
   return (
     <ReleasePage release={{ ...release.meta }} pastReleases={pastReleases} isPreview>
-      <MDXContent source={contentWithFixedPaths} />
+      <MDXContent source={processedContent} />
     </ReleasePage>
   );
 }

@@ -44,14 +44,20 @@ export default async function ReleaseSlugPage({
     }));
 
   // Rewrite relative media paths to public paths
-  const contentWithFixedPaths = release.content.replace(
+  let processedContent = release.content.replace(
     /src="\.\/([^"]+)"/g,
     `src="/releases/${slug}/$1"`
   );
 
+  // Clean up stray markdown bold/italic that MDX doesn't render
+  processedContent = processedContent.replace(
+    /^\*\*(.+?)\*\*$/gm,
+    "$1"
+  );
+
   return (
     <ReleasePage release={{ ...release.meta }} pastReleases={pastReleases}>
-      <MDXContent source={contentWithFixedPaths} />
+      <MDXContent source={processedContent} />
     </ReleasePage>
   );
 }
