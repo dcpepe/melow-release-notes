@@ -220,11 +220,20 @@ export default function EditRelease() {
       ? "/api/upload"
       : `/api/releases/${editSlug || slug}/upload`;
 
-    const res = await fetch(endpoint, { method: "POST", body: formData });
-    const result = await res.json();
-    setUploading(null);
-    setMediaFiles((prev) => [...prev, result.filename]);
-    return result;
+    try {
+      const res = await fetch(endpoint, { method: "POST", body: formData });
+      if (!res.ok) {
+        setUploading(null);
+        return null;
+      }
+      const result = await res.json();
+      setUploading(null);
+      setMediaFiles((prev) => [...prev, result.filename]);
+      return result;
+    } catch {
+      setUploading(null);
+      return null;
+    }
   }
 
   function moveSection(index: number, direction: -1 | 1) {
@@ -257,21 +266,28 @@ export default function EditRelease() {
     ]);
   }
 
-  async function handleMediaDrop(e: React.DragEvent, sectionIndex: number) {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-
+  async function handleMediaUpload(file: File, sectionIndex: number) {
     const result = await uploadFile(file, sections[sectionIndex].id);
+    if (!result) return;
 
     const ext = file.name.split(".").pop()?.toLowerCase();
     let type: "Video" | "Gif" | "Screenshot" = "Screenshot";
     if (ext === "mp4" || ext === "webm") type = "Video";
     if (ext === "gif") type = "Gif";
 
+    // For temp uploads, use the previewUrl. For release uploads, build the public path.
+    const previewUrl = result.previewUrl || `/releases/${editSlug}/${file.name}`;
+
     updateSection(sectionIndex, {
-      media: { type, src: result.src, caption: "", previewUrl: result.previewUrl || result.publicUrl },
+      media: { type, src: `./${file.name}`, caption: "", previewUrl },
     });
+  }
+
+  async function handleMediaDrop(e: React.DragEvent, sectionIndex: number) {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    await handleMediaUpload(file, sectionIndex);
   }
 
   function handleMediaFileSelect(sectionIndex: number) {
@@ -281,17 +297,7 @@ export default function EditRelease() {
     input.onchange = async (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-
-      const result = await uploadFile(file, sections[sectionIndex].id);
-
-      const ext = file.name.split(".").pop()?.toLowerCase();
-      let type: "Video" | "Gif" | "Screenshot" = "Screenshot";
-      if (ext === "mp4" || ext === "webm") type = "Video";
-      if (ext === "gif") type = "Gif";
-
-      updateSection(sectionIndex, {
-        media: { type, src: result.src, caption: "", previewUrl: result.previewUrl || result.publicUrl },
-      });
+      await handleMediaUpload(file, sectionIndex);
     };
     input.click();
   }
