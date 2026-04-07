@@ -29,7 +29,7 @@ export default function EditRelease() {
   const [showPreview, setShowPreview] = useState(false);
   const [isNewDraft, setIsNewDraft] = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [genStatus, setGenStatus] = useState("");
+  const [genSteps, setGenSteps] = useState<string[]>([]);
 
   useEffect(() => {
     if (isNew) {
@@ -71,47 +71,74 @@ export default function EditRelease() {
 
   async function generateFromLinear() {
     setGenerating(true);
-    setGenStatus("Fetching tickets from Linear...");
+    setGenSteps(["Starting generation..."]);
 
     try {
       const res = await fetch("/api/releases/draft", { method: "POST" });
-      const result = await res.json();
-
-      if (result.error) {
-        setGenStatus(result.error);
+      const reader = res.body?.getReader();
+      if (!reader) {
+        setGenSteps((prev) => [...prev, "Failed to connect to server."]);
+        setGenerating(false);
+        return;
       }
 
-      if (result.draft) {
-        setMeta((prev) => ({
-          ...prev,
-          headline: result.draft.meta.headline || prev.headline,
-          summary: result.draft.meta.summary || prev.summary,
-          tags: result.draft.meta.tags || prev.tags,
-        }));
-        setEditSlug(result.draft.meta.slug || editSlug);
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-        if (result.draft.sections && result.draft.sections.length > 0) {
-          const newSections: Section[] = result.draft.sections.map(
-            (s: { heading: string; body: string; mediaSuggestion?: string; sourceUrl?: string }, i: number) => ({
-              id: `s_gen_${Date.now()}_${i}`,
-              heading: s.heading,
-              body: s.body,
-              media: undefined,
-              mediaSuggestion: s.mediaSuggestion || undefined,
-              sourceUrl: s.sourceUrl || undefined,
-            })
-          );
-          setSections(newSections);
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const match = line.match(/^data: (.+)$/);
+          if (!match) continue;
+
+          try {
+            const event = JSON.parse(match[1]);
+
+            if (event.type === "step") {
+              setGenSteps((prev) => [...prev, event.message]);
+            }
+
+            if (event.type === "error") {
+              setGenSteps((prev) => [...prev, `Error: ${event.message}`]);
+            }
+
+            if (event.type === "done" && event.draft) {
+              const draft = event.draft;
+              setMeta((prev) => ({
+                ...prev,
+                headline: draft.meta.headline || prev.headline,
+                summary: draft.meta.summary || prev.summary,
+                tags: draft.meta.tags || prev.tags,
+              }));
+              setEditSlug(draft.meta.slug || editSlug);
+
+              if (draft.sections && draft.sections.length > 0) {
+                const newSections: Section[] = draft.sections.map(
+                  (s: { heading: string; body: string; mediaSuggestion?: string; sourceUrl?: string }, i: number) => ({
+                    id: `s_gen_${Date.now()}_${i}`,
+                    heading: s.heading,
+                    body: s.body,
+                    media: undefined,
+                    mediaSuggestion: s.mediaSuggestion || undefined,
+                    sourceUrl: s.sourceUrl || undefined,
+                  })
+                );
+                setSections(newSections);
+              }
+            }
+          } catch {
+            // skip malformed events
+          }
         }
-
-        setGenStatus(
-          result.ticketCount > 0
-            ? `Generated from ${result.ticketCount} tickets. Edit and save when ready.`
-            : ""
-        );
       }
     } catch {
-      setGenStatus("Failed to connect. Check API keys in Vercel settings.");
+      setGenSteps((prev) => [...prev, "Connection failed. Check your API keys in Vercel settings."]);
     }
 
     setGenerating(false);
@@ -381,28 +408,39 @@ export default function EditRelease() {
               </div>
             )}
 
-            {/* Generation status */}
-            {(generating || genStatus) && (
+            {/* Generation log */}
+            {genSteps.length > 0 && (
               <div
                 className="mb-6 p-4 rounded-lg"
                 style={{ background: "rgba(201, 162, 75, 0.08)", border: "0.5px solid rgba(201, 162, 75, 0.2)" }}
               >
-                <div className="flex items-center gap-3">
-                  {generating && (
-                    <div
-                      className="w-4 h-4 border-2 border-gold border-t-transparent rounded-full shrink-0"
-                      style={{ animation: "spin 0.8s linear infinite" }}
-                    />
-                  )}
-                  <div>
-                    <p className="text-sm text-gold">{genStatus}</p>
-                    {generating && (
-                      <p className="text-xs text-text-tertiary mt-1">
-                        This may take 15-30 seconds.
+                <div className="space-y-1.5">
+                  {genSteps.map((step, i) => (
+                    <div key={i} className="flex items-start gap-2">
+                      {i === genSteps.length - 1 && generating ? (
+                        <div
+                          className="w-3 h-3 border-[1.5px] border-gold border-t-transparent rounded-full shrink-0 mt-0.5"
+                          style={{ animation: "spin 0.8s linear infinite" }}
+                        />
+                      ) : (
+                        <span className="text-gold text-xs mt-0.5 shrink-0">
+                          {step.startsWith("Error") ? "x" : "\u2713"}
+                        </span>
+                      )}
+                      <p className={`text-xs ${step.startsWith("Error") ? "text-red-400" : "text-text-secondary"}`}>
+                        {step}
                       </p>
-                    )}
-                  </div>
+                    </div>
+                  ))}
                 </div>
+                {!generating && genSteps.length > 0 && (
+                  <button
+                    onClick={() => setGenSteps([])}
+                    className="text-xs text-text-tertiary hover:text-text-primary mt-3 transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                )}
               </div>
             )}
 
