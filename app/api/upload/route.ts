@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
-import crypto from "crypto";
-
-const UPLOAD_DIR = path.join("/tmp", "melow-uploads");
+import { put } from "@vercel/blob";
 
 export async function POST(request: Request) {
   try {
@@ -11,21 +7,17 @@ export async function POST(request: Request) {
     const file = formData.get("file") as File | null;
     if (!file) return NextResponse.json({ error: "No file" }, { status: 400 });
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
-
-    const id = crypto.randomBytes(8).toString("hex");
-    const ext = path.extname(file.name);
-    const storedName = `${id}${ext}`;
-
-    fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-    fs.writeFileSync(path.join(UPLOAD_DIR, storedName), buffer);
+    // Upload to Vercel Blob for persistent storage
+    const blob = await put(`releases/${file.name}`, file, {
+      access: "public",
+      addRandomSuffix: true,
+    });
 
     return NextResponse.json({
       filename: file.name,
-      storedName,
       src: `./${file.name}`,
-      previewUrl: `/api/upload/${storedName}`,
+      previewUrl: blob.url,
+      blobUrl: blob.url,
     });
   } catch (err) {
     return NextResponse.json(

@@ -60,10 +60,13 @@ export function parseSections(mdxContent: string): Section[] {
       /^<(Video|Gif|Screenshot)\s+src="([^"]+)"(?:\s+caption="([^"]*)")?\s*\/>/
     );
     if (mediaMatch) {
+      const mediaSrc = mediaMatch[2];
+      const isBlob = mediaSrc.startsWith("http");
       currentMedia = {
         type: mediaMatch[1] as "Video" | "Gif" | "Screenshot",
-        src: mediaMatch[2],
+        src: isBlob ? mediaSrc : mediaSrc,
         caption: mediaMatch[3] || undefined,
+        previewUrl: isBlob ? mediaSrc : undefined,
       };
       continue;
     }
@@ -112,8 +115,10 @@ export function serializeSections(sections: Section[]): string {
       const captionAttr = section.media.caption
         ? ` caption="${section.media.caption}"`
         : "";
+      // Use blob URL if available, otherwise use relative path
+      const mediaSrc = section.media.previewUrl || section.media.src;
       parts.push(
-        `<${section.media.type} src="${section.media.src}"${captionAttr} />`
+        `<${section.media.type} src="${mediaSrc}"${captionAttr} />`
       );
       parts.push("");
     }
