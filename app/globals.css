@@ -1,0 +1,72 @@
+@import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap");
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0a0a;
+  --surface: #141414;
+  --border: rgba(201, 162, 75, 0.15);
+  --text-primary: #f5f5f5;
+  --text-secondary: rgba(245, 245, 245, 0.65);
+  --text-tertiary: rgba(245, 245, 245, 0.4);
+  --gold: #c9a24b;
+  --gold-muted: rgba(201, 162, 75, 0.55);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-border: var(--border);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-tertiary: var(--text-tertiary);
+  --color-gold: var(--gold);
+  --color-gold-muted: var(--gold-muted);
+  --font-serif: "Instrument Serif", serif;
+  --font-sans: Arial, -apple-system, system-ui, sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: Arial, -apple-system, system-ui, sans-serif;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Prose styles for MDX content */
+.prose h2 {
+  font-family: "Instrument Serif", serif;
+  font-size: 1.75rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin-top: 3rem;
+  margin-bottom: 1rem;
+}
+
+.prose p {
+  color: var(--text-secondary);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  margin-bottom: 1.25rem;
+}
+
+.prose ul {
+  color: var(--text-secondary);
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  list-style: disc;
+  padding-left: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.prose li {
+  margin-bottom: 0.5rem;
+}
+
+.prose strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
