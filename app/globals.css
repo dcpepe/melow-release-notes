@@ -25,10 +25,24 @@
   --font-sans: Arial, -apple-system, system-ui, sans-serif;
 }
 
+* {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 body {
   background: var(--bg);
   color: var(--text-primary);
   font-family: Arial, -apple-system, system-ui, sans-serif;
+}
+
+::selection {
+  background: rgba(201, 162, 75, 0.25);
+  color: var(--text-primary);
 }
 
 .tabular-nums {
@@ -38,27 +52,32 @@ body {
 /* Prose styles for MDX content */
 .prose h2 {
   font-family: "Instrument Serif", serif;
-  font-size: 1.75rem;
+  font-size: 1.65rem;
   font-weight: 400;
   letter-spacing: -0.02em;
   color: var(--text-primary);
-  margin-top: 3rem;
-  margin-bottom: 1rem;
+  margin-top: 3.5rem;
+  margin-bottom: 0.75rem;
+  line-height: 1.15;
+}
+
+.prose h2:first-child {
+  margin-top: 0;
 }
 
 .prose p {
   color: var(--text-secondary);
-  font-size: 1.0625rem;
-  line-height: 1.7;
+  font-size: 1rem;
+  line-height: 1.75;
   margin-bottom: 1.25rem;
 }
 
 .prose ul {
   color: var(--text-secondary);
-  font-size: 1.0625rem;
-  line-height: 1.7;
+  font-size: 1rem;
+  line-height: 1.75;
   list-style: disc;
-  padding-left: 1.5rem;
+  padding-left: 1.25rem;
   margin-bottom: 1.25rem;
 }
 
@@ -66,7 +85,21 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.prose li::marker {
+  color: var(--gold-muted);
+}
+
 .prose strong {
   color: var(--text-primary);
   font-weight: 600;
+}
+
+.prose a {
+  color: var(--gold);
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.prose a:hover {
+  color: var(--text-primary);
 }

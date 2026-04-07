@@ -15,11 +15,11 @@ export default function PastIssues({
 }) {
   return (
     <section>
-      <h3 className="text-xs text-text-tertiary uppercase tracking-wider mb-6">
+      <h3 className="text-[10px] text-text-tertiary uppercase tracking-[0.15em] mb-8">
         Past Issues
       </h3>
-      <div className="space-y-0">
-        {releases.map((r) => {
+      <div>
+        {releases.map((r, i) => {
           const formattedDate = new Date(r.date).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -28,18 +28,21 @@ export default function PastIssues({
             <Link
               key={r.slug}
               href={`/release-notes/${r.slug}`}
-              className="flex items-baseline gap-4 py-3 border-b border-border hover:bg-surface/50 transition-colors -mx-3 px-3 rounded"
+              className="group flex items-baseline gap-5 py-3.5 transition-colors -mx-3 px-3"
+              style={{
+                borderBottom: i < releases.length - 1 ? "0.5px solid rgba(201, 162, 75, 0.08)" : "none",
+              }}
             >
-              <span className="text-xs text-text-tertiary tabular-nums w-16 shrink-0">
+              <span className="text-[12px] text-text-tertiary tabular-nums w-16 shrink-0">
                 {formattedDate}
               </span>
-              <span className="text-xs text-text-tertiary tabular-nums w-10 shrink-0">
+              <span className="text-[12px] text-text-tertiary tabular-nums w-12 shrink-0">
                 #{String(r.issue).padStart(3, "0")}
               </span>
-              <span className="text-xs text-text-tertiary tabular-nums w-14 shrink-0">
+              <span className="text-[12px] text-text-tertiary tabular-nums w-16 shrink-0">
                 v{r.version}
               </span>
-              <span className="text-sm text-text-secondary truncate">
+              <span className="text-[14px] text-text-secondary group-hover:text-text-primary transition-colors truncate">
                 {r.headline}
               </span>
             </Link>

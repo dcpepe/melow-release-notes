@@ -1,5 +1,7 @@
 import { LinearClient } from "@linear/sdk";
 
+const TEAM_KEY = "M";
+
 export interface LinearTicket {
   id: string;
   title: string;
@@ -18,7 +20,8 @@ export async function fetchCompletedTickets(since: string): Promise<LinearTicket
 
   const issues = await client.issues({
     filter: {
-      state: { type: { eq: "completed" } },
+      team: { key: { eq: TEAM_KEY } },
+      state: { name: { eq: "Done" } },
       completedAt: { gt: new Date(since) },
     },
     first: 100,
