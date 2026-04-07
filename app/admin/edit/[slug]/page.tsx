@@ -169,9 +169,8 @@ export default function EditRelease() {
       });
       setIsNewDraft(false);
       setSaving(false);
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-      router.push(`/admin/edit/${targetSlug}`);
+      // Go straight to preview
+      setShowPreview(true);
     } else {
       await fetch(`/api/releases/${slug}`, {
         method: "PUT",
@@ -334,7 +333,33 @@ export default function EditRelease() {
 
         {showPreview ? (
           /* Preview mode */
-          <div className="rounded-lg p-8" style={{ background: "#161616", border: "0.5px solid rgba(201, 162, 75, 0.15)" }}>
+          <>
+            {/* Publish bar */}
+            <div
+              className="mb-8 p-4 rounded-lg flex items-center justify-between"
+              style={{ background: "rgba(201, 162, 75, 0.08)", border: "0.5px solid rgba(201, 162, 75, 0.2)" }}
+            >
+              <p className="text-sm text-text-secondary">
+                Review your release notes below. Ready to go live?
+              </p>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="text-sm text-text-tertiary hover:text-text-primary px-3 py-1.5 rounded border border-border transition-colors"
+                >
+                  Back to editing
+                </button>
+                <a
+                  href={`/release-notes/${editSlug}`}
+                  target="_blank"
+                  className="text-sm text-bg bg-gold px-4 py-1.5 rounded hover:opacity-90 transition-opacity"
+                >
+                  Publish
+                </a>
+              </div>
+            </div>
+
+            <div className="rounded-lg p-8" style={{ background: "#161616", border: "0.5px solid rgba(201, 162, 75, 0.15)" }}>
             <p className="font-serif italic text-xl text-text-primary mb-6">Melow Weekly</p>
             <p className="text-[13px] text-text-tertiary mb-8 tabular-nums">
               {meta.date} | Issue #{String(meta.issue).padStart(3, "0")} | v{meta.version}
@@ -378,6 +403,7 @@ export default function EditRelease() {
               ))}
             </div>
           </div>
+          </>
         ) : (
           /* Editor mode */
           <>
